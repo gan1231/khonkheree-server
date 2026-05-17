@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+*.egg-info/
+dist/
+.pytest_cache/
+.mypy_cache/
+migrations/versions/__pycache__/
+app/ml/book_images/
+*.jpg
+*.jpeg
+*.png
