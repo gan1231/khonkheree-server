@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     VISION_MODEL: str = "qwen2.5vl:7b"
 
+    # Donut (ML)
+    USE_DONUT: bool = True
+    DONUT_MODEL_PATH: str = "naver-clova-ix/donut-base-sys"
+
     # CORS
     ALLOWED_ORIGINS: list[str] = ["https://khonkheree.app", "http://localhost:3000"]
 

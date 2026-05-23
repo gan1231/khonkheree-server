@@ -41,13 +41,30 @@ def extract_book_info(
     Номын хавтасны зургаас мэдээлэл гаргана.
 
     Урсгал:
-      1. EasyOCR — кирилл/латин текстийг хурдан гарган авна (~1 сек)
-      2. OCR амжилттай бол Vision LLM-д OCR текстийг дамжуулж бүтэцжүүлнэ
-      3. OCR бүтэлгүйтвэл Vision LLM зургийг шууд уншина (fallback)
+      1. Donut — Хэрэв идэвхтэй бол хамгийн түрүүнд Donut моделиор уншина
+      2. EasyOCR — Кирилл/латин текстийг хурдан гарган авна (Donut-ийн fallback)
+      3. OCR амжилттай бол Vision LLM-д OCR текстийг дамжуулж бүтэцжүүлнэ
+      4. OCR бүтэлгүйтвэл Vision LLM зургийг шууд уншина (fallback)
     """
+    from app.core.config import settings
+    
+    # 1-р алхам: Donut ажиллуулах (хэрэв идэвхтэй бол)
+    if getattr(settings, "USE_DONUT", False):
+        try:
+            from app.ml.donut_model import get_donut_predictor
+            predictor = get_donut_predictor(settings.DONUT_MODEL_PATH)
+            donut_result = predictor.predict(str(image_path))
+            
+            # Хэрэв өндөр эсвэл дунд итгэлцүүртэй таньсан бол шууд буцаана
+            if donut_result.get("confidence") in ("high", "medium") and donut_result.get("title"):
+                return donut_result
+        except Exception:
+            # Алдаа гарвал дараагийн OCR / Ollama урсгал руу fallback хийнэ
+            pass
+
     from ocr import extract_texts, texts_to_book_info, save_crops
 
-    # 1-р үе шат: EasyOCR
+    # 2-р алхам: EasyOCR (fallback)
     ocr_results = extract_texts(image_path)
     ocr_ok = ocr_results and not ocr_results[0].get("error")
 

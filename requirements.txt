@@ -28,3 +28,10 @@ python-multipart==0.0.12
 
 # AWS/R2 (S3-compatible)
 boto3==1.35.45
+
+# Donut ML
+transformers>=4.40.0
+torch>=2.0.0
+sentencepiece
+protobuf
+
