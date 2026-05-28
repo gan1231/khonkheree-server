@@ -1,5 +1,5 @@
 from fastapi import WebSocket, WebSocketDisconnect
-from typing import dict as Dict
+from typing import Dict
 import uuid, json
 
 # conversation_id → {user_id: WebSocket}

@@ -1,12 +1,13 @@
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, String, Boolean, Text, Numeric, Integer,
+    Column, String, Boolean, Text, Numeric, Integer, Float,
     ForeignKey, DateTime, Enum as PgEnum, UniqueConstraint, CheckConstraint,
     event,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 import enum
 from app.db.base import Base
 
@@ -160,3 +161,65 @@ class SyncLog(Base):
     payload = Column(Text, nullable=True)  # JSON string
     client_timestamp = Column(DateTime(timezone=True), nullable=False)
     synced_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+
+# ─── Active Learning / Feedback Loop (Алхам 1) ──────────────────────────────
+
+class TrainingSample(Base):
+    """
+    Хэрэглэгчийн баталгаажуулсан мэдээллийг хадгалах хүснэгт.
+    AI-ийн таних дүнтэй харьцуулж, засвар бүрийг сургалтын датасет болгоно.
+    """
+    __tablename__ = "training_samples"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Redis-ийн кэшийн түлхүүр — identify-book endpoint-аас буцаасан predict_id
+    predict_id = Column(String(36), nullable=True, index=True)
+
+    # Зургийн байршил (локал training_images/ хавтас)
+    image_path = Column(Text, nullable=True)
+
+    # AI-ийн анхны таних дүн
+    ai_title = Column(String(500), nullable=True)
+    ai_author = Column(String(500), nullable=True)
+    ai_confidence = Column(String(20), nullable=True)   # "low" | "medium" | "high"
+    ai_method = Column(String(20), nullable=True)       # "isbn" | "vision" | "db"
+
+    # Хэрэглэгчийн баталгаажуулсан зөв мэдээлэл
+    correct_title = Column(String(500), nullable=False)
+    correct_author = Column(String(500), nullable=False)
+
+    # AI буруу таньсан эсэх — сургалтанд хамгийн үнэт дохио
+    was_corrected = Column(Boolean, nullable=False, default=False)
+
+    # Active Learning: итгэлцэл бага үед True — хэрэглэгчийн баталгаажуулалт шаарддаг (Алхам 3)
+    needs_review = Column(Boolean, nullable=False, default=False)
+
+    # Donut сургалтанд ашигласан эсэх
+    used_in_training = Column(Boolean, nullable=False, default=False)
+    trained_at = Column(DateTime(timezone=True), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)
+
+    book_id = Column(UUID(as_uuid=True), ForeignKey("books.id", ondelete="SET NULL"), nullable=True)
+
+
+# ─── Vector DB / CLIP Embeddings (Алхам 2) ──────────────────────────────────
+
+class BookEmbedding(Base):
+    """
+    Номын хавтасны CLIP зургийн embedding хадгалах хүснэгт.
+    sentence-transformers clip-ViT-B-32 загварын 512 хэмжээст вектор.
+    Шинэ ном нэмэхэд тэр дороо тооцоологдож хадгалагдана.
+    pgvector cosine_distance ашиглан ижил хавтастай номыг хурдан хайна.
+    """
+    __tablename__ = "book_embeddings"
+
+    book_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("books.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    embedding = Column(Vector(512), nullable=False)   # CLIP ViT-B/32 — 512 хэмжээ
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=utcnow)

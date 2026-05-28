@@ -35,3 +35,9 @@ torch>=2.0.0
 sentencepiece
 protobuf
 
+# Vector DB (pgvector — CLIP embedding хадгалах)
+pgvector==0.3.6
+
+# Автомат хуваарьт сургалт
+apscheduler==3.10.4
+

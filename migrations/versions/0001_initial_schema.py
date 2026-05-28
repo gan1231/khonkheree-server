@@ -17,11 +17,6 @@ depends_on = None
 def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS pgcrypto")
 
-    # Enums
-    op.execute("CREATE TYPE book_status AS ENUM ('owned','want_to_read','want_to_discuss','for_sale','for_exchange')")
-    op.execute("CREATE TYPE sync_action AS ENUM ('create','update','delete')")
-    op.execute("CREATE TYPE sync_entity AS ENUM ('book','review','message','conversation')")
-
     op.create_table(
         "users",
         sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("gen_random_uuid()")),

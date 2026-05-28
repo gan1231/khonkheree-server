@@ -1,10 +1,26 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.core.config import settings
 from app.api.v1 import auth, books, reviews, messages, ml
 from app.ws.handler import ws_connect
 
-app = FastAPI(title=settings.APP_NAME, version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    FastAPI lifespan — серверийн эхлэлт болон зогсолтын үед дуудагдана.
+    Алхам 4 (Auto Retrain): APScheduler-ийг энд эхлүүлж, зогсоогдоход унтраана.
+    """
+    from app.ml.scheduler import start_scheduler, stop_scheduler
+    start_scheduler()
+    yield
+    stop_scheduler()
+
+
+app = FastAPI(title=settings.APP_NAME, version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

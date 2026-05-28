@@ -39,6 +39,15 @@ class Settings(BaseSettings):
     # Donut (ML)
     USE_DONUT: bool = True
     DONUT_MODEL_PATH: str = "naver-clova-ix/donut-base-sys"
+    DONUT_OUTPUT_MODEL_DIR: str = "app/ml/models/donut-khonkheree"
+
+    # Active Learning / Feedback Loop (Алхам 1)
+    TRAINING_IMAGES_DIR: str = "app/ml/training_images"
+    PREDICT_CACHE_TTL_SECONDS: int = 1800  # Redis-д AI таних дүн 30 мин хадгалагдана
+
+    # Auto Retrain Scheduler (Алхам 4)
+    AUTO_RETRAIN_THRESHOLD: int = 50   # Хэдэн шинэ датасет хуримтлагдахад сургах
+    RETRAIN_CRON_HOUR: int = 3         # Шөнийн 3 цагт автомат шалгалт хийнэ
 
     # CORS
     ALLOWED_ORIGINS: list[str] = ["https://khonkheree.app", "http://localhost:3000"]
