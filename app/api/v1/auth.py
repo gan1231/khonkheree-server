@@ -89,6 +89,27 @@ async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     )
 
 
+class UserOut(BaseModel):
+    id: uuid.UUID
+    name: str
+    email: str
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/me", response_model=UserOut)
+async def get_me(
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(User).where(User.id == user_id, User.deleted_at.is_(None)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="Хэрэглэгч олдсонгүй")
+    return UserOut.model_validate(user)
+
+
 @router.delete("/account", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_account(
     user_id: uuid.UUID = Depends(get_current_user_id),

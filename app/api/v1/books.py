@@ -173,6 +173,62 @@ async def search_books(
     return result
 
 
+@router.get("/matches", response_model=list[BookOut])
+async def find_matches_by_query(
+    title: str = Query(...),
+    my_status: str = Query(...),
+    author: Optional[str] = Query(None),
+    isbn: Optional[str] = Query(None),
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    want_to_read → for_sale, for_exchange тохирох номыг хайна.
+    for_sale / for_exchange → want_to_read тохирох номыг хайна.
+    """
+    status_map = {
+        "want_to_read": [BookStatus.for_sale, BookStatus.for_exchange],
+        "for_sale": [BookStatus.want_to_read],
+        "for_exchange": [BookStatus.want_to_read],
+    }
+    target_statuses = status_map.get(my_status)
+    if not target_statuses:
+        return []
+
+    match_conds = []
+    if isbn:
+        match_conds.append(Book.isbn == isbn)
+    if author:
+        match_conds.append(
+            (func.lower(Book.title) == func.lower(title))
+            & (func.lower(Book.author) == func.lower(author))
+        )
+    else:
+        match_conds.append(func.lower(Book.title) == func.lower(title))
+
+    stmt = (
+        select(Book, func.count(Review.id).label("review_count"))
+        .outerjoin(Review, Review.book_id == Book.id)
+        .where(
+            Book.user_id != user_id,
+            Book.is_public.is_(True),
+            Book.deleted_at.is_(None),
+            Book.status.in_(target_statuses),
+            or_(*match_conds),
+        )
+        .group_by(Book.id)
+        .order_by(Book.added_date.desc())
+        .limit(20)
+    )
+    rows = (await db.execute(stmt)).all()
+    result = []
+    for book, count in rows:
+        out = BookOut.model_validate(book)
+        out.review_count = count
+        result.append(out)
+    return result
+
+
 @router.get("/mine", response_model=list[BookOut])
 async def my_books(
     user_id: uuid.UUID = Depends(get_current_user_id),
@@ -184,6 +240,63 @@ async def my_books(
         .where(Book.user_id == user_id, Book.deleted_at.is_(None))
         .group_by(Book.id)
         .order_by(Book.added_date.desc())
+    )
+    rows = (await db.execute(stmt)).all()
+    result = []
+    for book, count in rows:
+        out = BookOut.model_validate(book)
+        out.review_count = count
+        result.append(out)
+    return result
+
+
+@router.get("/{book_id}/matches", response_model=list[BookOut])
+async def get_book_matches(
+    book_id: uuid.UUID,
+    user_id: uuid.UUID = Depends(get_current_user_id),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Тодорхой номын ID-аар тохирох номуудыг хайна.
+    want_to_read → for_sale, for_exchange
+    for_sale / for_exchange → want_to_read
+    """
+    src = (await db.execute(
+        select(Book).where(Book.id == book_id, Book.deleted_at.is_(None))
+    )).scalar_one_or_none()
+    if not src:
+        raise HTTPException(status_code=404, detail="Ном олдсонгүй")
+
+    status_map = {
+        BookStatus.want_to_read: [BookStatus.for_sale, BookStatus.for_exchange],
+        BookStatus.for_sale: [BookStatus.want_to_read],
+        BookStatus.for_exchange: [BookStatus.want_to_read],
+    }
+    target_statuses = status_map.get(src.status)
+    if not target_statuses:
+        return []
+
+    match_conds = []
+    if src.isbn:
+        match_conds.append(Book.isbn == src.isbn)
+    match_conds.append(
+        (func.lower(Book.title) == func.lower(src.title))
+        & (func.lower(Book.author) == func.lower(src.author))
+    )
+
+    stmt = (
+        select(Book, func.count(Review.id).label("review_count"))
+        .outerjoin(Review, Review.book_id == Book.id)
+        .where(
+            Book.user_id != user_id,
+            Book.is_public.is_(True),
+            Book.deleted_at.is_(None),
+            Book.status.in_(target_statuses),
+            or_(*match_conds),
+        )
+        .group_by(Book.id)
+        .order_by(Book.added_date.desc())
+        .limit(20)
     )
     rows = (await db.execute(stmt)).all()
     result = []
